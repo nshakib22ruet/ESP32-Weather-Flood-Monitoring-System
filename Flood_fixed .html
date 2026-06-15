@@ -1,0 +1,1105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no"/>
+<meta name="mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<title>Weather & Flood Monitor</title>
+<style>
+:root {
+  --bg:       #07101a;
+  --surface:  #0b1929;
+  --card:     #0e1f30;
+  --card2:    #112438;
+  --border:   #163550;
+  --border2:  #1e4a6e;
+  --text:     #c8e8ff;
+  --dim:      #3a6a8a;
+  --dim2:     #5a8aaa;
+
+  --water:    #00b4d8;
+  --water2:   #0077b6;
+  --water3:   #90e0ef;
+
+  --temp:     #ff6b35;
+  --temp2:    #ff9a6c;
+  --hum:      #48cae4;
+  --hum2:     #90e0ef;
+  --rain-c:   #4895ef;
+
+  --sunny:    #ffd60a;
+  --hot:      #ff5e00;
+  --cool:     #a8dadc;
+  --humid:    #9ecae1;
+  --storm:    #6c63ff;
+  --flood:    #e63946;
+  --safe:     #2ec4b6;
+  --warn:     #f4a261;
+  --danger:   #e63946;
+  --purple-warn: #b620e0;
+
+  --chart-h: 100px;
+}
+
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+
+body{
+  background:var(--bg);
+  color:var(--text);
+  font-family:'Courier New',Courier,monospace;
+  min-height:100vh;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  padding:12px 12px 40px;
+  overflow-x:hidden;
+}
+
+/* ===== FLOOD ALERT BANNERS ===== */
+#floodBanner{
+  display:none;
+  width:100%;max-width:420px;
+  background:var(--danger);
+  color:#fff;
+  text-align:center;
+  padding:12px;
+  border-radius:8px;
+  font-size:15px;
+  font-weight:bold;
+  letter-spacing:3px;
+  margin-bottom:12px;
+  animation:flashBg 0.8s infinite alternate;
+}
+
+#quadraticAccelBanner {
+  display:none;
+  width:100%;max-width:420px;
+  background: rgba(182, 32, 224, 0.15);
+  border: 1.5px solid var(--purple-warn);
+  color: #ff9eff;
+  padding: 14px;
+  border-radius: 8px;
+  font-size: 11px;
+  font-weight: bold;
+  line-height: 1.5;
+  margin-bottom: 12px;
+  box-shadow: 0 0 15px rgba(182, 32, 224, 0.2);
+  animation: pulseBorder 1s infinite alternate;
+}
+
+@keyframes flashBg{from{opacity:1}to{opacity:0.4}}
+@keyframes pulseBorder{from{border-color: var(--purple-warn); box-shadow: 0 0 15px rgba(182, 32, 224, 0.4);} to{border-color: #5a0e73; box-shadow: 0 0 5px rgba(182, 32, 224, 0.1);}}
+
+/* ===== HEADER ===== */
+header{text-align:center;margin-bottom:14px;width:100%;}
+header h1{
+  font-size:clamp(15px,4.5vw,20px);
+  letter-spacing:4px;
+  color:var(--water);
+  text-shadow:0 0 18px rgba(0,180,216,0.4);
+}
+header p{font-size:9px;color:var(--dim);letter-spacing:2px;margin-top:3px;}
+
+/* ===== CONNECT ===== */
+#connectBtn{
+  width:100%;max-width:420px;
+  padding:13px;
+  background:transparent;
+  border:1.5px solid var(--water);
+  color:var(--water);
+  font-family:'Courier New',monospace;
+  font-size:12px;
+  letter-spacing:3px;
+  cursor:pointer;
+  border-radius:6px;
+  transition:all 0.25s;
+  margin-bottom:12px;
+}
+#connectBtn:hover{background:rgba(0,180,216,0.07);}
+#connectBtn:disabled{opacity:0.35;cursor:not-allowed;}
+#connectBtn.connected{border-color:var(--safe);color:var(--safe);}
+
+/* ===== STATUS BAR ===== */
+.status-bar{
+  width:100%;max-width:420px;
+  display:flex;align-items:center;gap:10px;
+  padding:8px 12px;
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:5px;
+  font-size:10px;
+  margin-bottom:12px;
+}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--dim);flex-shrink:0;}
+.dot.live{background:var(--safe);animation:pulse 2s infinite;}
+.dot.err{background:var(--danger);}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.3}}
+#statusText{color:var(--dim);}
+
+/* ===== CALIBRATION BAR ===== */
+#calibCard{
+  width:100%;max-width:420px;
+  background:var(--card);
+  border:1px solid var(--border);
+  border-radius:8px;
+  padding:12px 14px;
+  margin-bottom:12px;
+}
+.calib-header{display:flex;justify-content:space-between;font-size:10px;color:var(--dim);margin-bottom:6px;}
+.calib-bar-wrap{height:5px;background:var(--border);border-radius:3px;overflow:hidden;}
+.calib-bar-fill{height:100%;background:linear-gradient(90deg,var(--water2),var(--water3));border-radius:3px;transition:width 0.5s;}
+.calib-info{display:flex;justify-content:space-between;font-size:10px;margin-top:6px;}
+#calibStatus{color:var(--warn);}
+#baseVal{color:var(--water3);}
+
+/* ===== WEATHER BLOCK ===== */
+#weatherBlock{
+  width:100%;max-width:420px;
+  background:var(--card);
+  border:1px solid var(--border2);
+  border-radius:12px;
+  padding:16px;
+  margin-bottom:12px;
+  position:relative;
+  overflow:hidden;
+}
+#weatherBlock::before{
+  content:'';
+  position:absolute;
+  top:0;left:0;right:0;height:2px;
+  background:linear-gradient(90deg,transparent,var(--water),transparent);
+}
+.wx-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;}
+.wx-icon{font-size:52px;line-height:1;filter:drop-shadow(0 0 12px rgba(255,255,255,0.15));}
+.wx-right{text-align:right;}
+#dayLabel{
+  font-size:clamp(14px,4vw,18px);
+  font-weight:bold;
+  letter-spacing:3px;
+  transition:color 0.5s;
+}
+#daySubLabel{font-size:10px;color:var(--dim);letter-spacing:2px;margin-top:4px;}
+
+.wx-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+.wx-cell{
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:6px;
+  padding:10px 12px;
+}
+.wx-cell-label{font-size:8px;color:var(--dim);letter-spacing:2px;margin-bottom:4px;}
+.wx-cell-val{
+  font-size:clamp(22px,6vw,28px);
+  font-weight:bold;
+  line-height:1;
+  transition:color 0.4s;
+}
+.wx-cell-unit{font-size:10px;color:var(--dim);margin-top:2px;}
+
+.rain-dots{display:flex;gap:4px;margin-top:4px;}
+.rain-dot{width:10px;height:10px;border-radius:50%;background:var(--border);}
+.rain-dot.active{background:var(--rain-c);}
+
+/* ===== WATER TANK ===== */
+#tankCard{
+  width:100%;max-width:420px;
+  background:var(--card);
+  border:1px solid var(--border);
+  border-radius:10px;
+  padding:14px;
+  margin-bottom:12px;
+}
+.tank-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;}
+.tank-header h3{font-size:11px;color:var(--dim);letter-spacing:3px;}
+#flowBadge{
+  padding:4px 10px;
+  border-radius:4px;
+  font-size:10px;
+  font-weight:bold;
+  letter-spacing:2px;
+  border:1px solid var(--dim);
+  color:var(--dim);
+  transition:all 0.4s;
+}
+#flowBadge.RISING{color:var(--danger);border-color:var(--danger);}
+#flowBadge.FALLING{color:var(--safe);border-color:var(--safe);}
+#flowBadge.STOPPED{color:var(--dim2);border-color:var(--dim2);}
+#flowBadge.FLOOD{color:#fff;border-color:var(--danger);background:var(--danger);animation:flashBg 0.7s infinite alternate;}
+
+.tank-body{display:flex;gap:14px;align-items:flex-end;}
+.tank-visual-wrap{flex-shrink:0;width:60px;}
+.tank-outer{
+  width:60px;height:120px;
+  border:2px solid var(--border2);
+  border-radius:4px;
+  background:rgba(0,0,0,0.3);
+  overflow:hidden;
+  position:relative;
+}
+.tank-fill{
+  position:absolute;
+  bottom:0;left:0;right:0;
+  background:linear-gradient(180deg,var(--water3),var(--water2));
+  transition:height 1s cubic-bezier(0.4,0,0.2,1);
+  height:0%;
+}
+.tank-fill::after{
+  content:'';
+  position:absolute;
+  top:0;left:0;right:0;height:4px;
+  background:rgba(255,255,255,0.25);
+  animation:waveAnim 2.5s linear infinite;
+}
+@keyframes waveAnim{0%{opacity:0.6}50%{opacity:0.2}100%{opacity:0.6}}
+
+.tank-ticks{
+  position:absolute;right:-26px;top:0;height:120px;
+  display:flex;flex-direction:column;justify-content:space-between;
+  font-size:8px;color:var(--dim);
+}
+
+.tank-stats{flex:1;}
+.tank-big{
+  font-size:clamp(30px,9vw,42px);
+  font-weight:bold;
+  color:var(--water);
+  line-height:1;
+  transition:color 0.4s;
+}
+.tank-sub{font-size:10px;color:var(--dim);margin-top:4px;}
+.tank-rise{font-size:13px;font-weight:bold;margin-top:8px;}
+
+/* ===== STATS ROW ===== */
+.stats-row{
+  width:100%;max-width:420px;
+  display:grid;
+  grid-template-columns:repeat(3,1fr);
+  gap:8px;
+  margin-bottom:12px;
+}
+.stat-box{
+  background:var(--card);
+  border:1px solid var(--border);
+  border-radius:8px;
+  padding:10px 8px;
+  text-align:center;
+}
+.stat-val{font-size:17px;font-weight:bold;color:var(--water3);}
+.stat-lbl{font-size:8px;color:var(--dim);letter-spacing:1px;margin-top:3px;}
+
+/* ===== PREDICTION CARD ===== */
+#predCard{
+  width:100%;max-width:420px;
+  background:var(--card);
+  border:1px solid var(--border2);
+  border-radius:10px;
+  padding:14px;
+  margin-bottom:12px;
+}
+#predCard h3{font-size:11px;color:var(--dim);letter-spacing:3px;margin-bottom:4px;}
+#predCard .sub{font-size:9px;color:var(--dim);letter-spacing:1px;margin-bottom:12px;}
+
+.pred-grid{
+  display:grid;
+  grid-template-columns:repeat(2,1fr);
+  gap:8px;
+  margin-bottom:10px;
+}
+.pred-item{
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:6px;
+  padding:10px 10px;
+}
+.pred-lbl{font-size:8px;color:var(--dim);letter-spacing:1px;margin-bottom:4px;}
+.pred-val{font-size:20px;font-weight:bold;line-height:1;transition:color 0.4s;}
+.pred-unit{font-size:9px;color:var(--dim);margin-top:2px;}
+.pred-trend{font-size:10px;margin-top:4px;}
+.trend-up{color:var(--danger);}
+.trend-dn{color:var(--safe);}
+.trend-fl{color:var(--dim2);}
+.trend-accel{color:var(--purple-warn); font-weight: bold;}
+
+/* Overflow risk pill */
+#overflowRisk{
+  padding:8px 12px;
+  border-radius:6px;
+  font-size:11px;
+  font-weight:bold;
+  letter-spacing:2px;
+  border:1px solid var(--border);
+  color:var(--dim);
+  text-align:center;
+  transition:all 0.4s;
+}
+#overflowRisk.low{color:var(--safe);border-color:var(--safe);}
+#overflowRisk.med{color:var(--warn);border-color:var(--warn);}
+#overflowRisk.high{color:var(--danger);border-color:var(--danger);animation:flashBg 1s infinite alternate;}
+
+/* ===== R2 CARD ===== */
+.r2-card{
+  width:100%;max-width:420px;
+  background:var(--card);
+  border:1px solid var(--border);
+  border-radius:8px;
+  padding:12px 14px;
+  margin-bottom:12px;
+}
+.r2-card h3{font-size:10px;color:var(--dim);letter-spacing:2px;margin-bottom:8px;}
+.r2-row{display:flex;align-items:center;gap:8px;margin-bottom:6px;}
+.r2-row:last-child{margin-bottom:0;}
+.r2-lbl{font-size:9px;color:var(--dim);width:80px;flex-shrink:0;}
+.r2-bar{flex:1;height:4px;background:var(--border);border-radius:2px;overflow:hidden;}
+.r2-fill{height:100%;border-radius:2px;transition:width 0.5s;}
+.r2-fill.w{background:var(--water);}
+.r2-fill.t{background:var(--temp);}
+.r2-fill.h{background:var(--hum);}
+.r2-pct{font-size:9px;color:var(--dim);width:28px;text-align:right;}
+
+/* ===== CHARTS ===== */
+.charts-section{
+  width:100%;max-width:420px;
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:8px;
+  margin-bottom:12px;
+}
+
+.chart-card-full{
+  width:100%;max-width:420px;
+  background:var(--card);
+  border:1px solid var(--border);
+  border-radius:8px;
+  padding:12px;
+  margin-bottom:8px;
+}
+
+.chart-card{
+  background:var(--card);
+  border:1px solid var(--border);
+  border-radius:8px;
+  padding:10px 8px;
+}
+.chart-card h3{font-size:8px;color:var(--dim);letter-spacing:2px;margin-bottom:6px;}
+.chart-card-full h3{font-size:9px;color:var(--dim);letter-spacing:2px;margin-bottom:8px;}
+canvas{width:100%;display:block;}
+
+/* ===== PROGRESS ===== */
+.prog-wrap{
+  width:100%;max-width:420px;
+  margin-bottom:10px;
+}
+.prog-header{display:flex;justify-content:space-between;font-size:9px;color:var(--dim);margin-bottom:4px;}
+.prog-bar{height:4px;background:var(--border);border-radius:2px;overflow:hidden;}
+.prog-fill{height:100%;background:linear-gradient(90deg,var(--water2),var(--water3));border-radius:2px;transition:width 0.5s;}
+
+/* ===== HISTORY ===== */
+.hist-card{
+  width:100%;max-width:420px;
+  background:var(--card);
+  border:1px solid var(--border);
+  border-radius:8px;
+  padding:12px;
+  margin-bottom:20px;
+}
+.hist-card h3{font-size:9px;color:var(--dim);letter-spacing:2px;margin-bottom:8px;}
+.hist-row{
+  display:grid;
+  grid-template-columns:52px 46px 38px 1fr 60px;
+  gap:4px;
+  font-size:9px;
+  padding:5px 0;
+  border-bottom:1px solid var(--border);
+  align-items:center;
+}
+.hist-row:last-child{border-bottom:none;}
+.h-time{color:var(--dim);}
+.h-temp{color:var(--temp2);}
+.h-hum{color:var(--hum2);}
+.h-water{color:var(--water3);}
+.h-day{color:var(--dim2);font-size:8px;text-align:right;}
+
+footer{font-size:9px;color:var(--dim);text-align:center;letter-spacing:1px;}
+</style>
+</head>
+<body>
+
+<div id="floodBanner">🚨 FLOOD WARNING — WATER RISING 🚨</div>
+<div id="quadraticAccelBanner">⚠️ CRITICAL FLOOD WARNING: Non-linear water acceleration detected under live rainfall!</div>
+
+<header>
+  <h1>WEATHER + FLOOD MONITOR</h1>
+  <p>HC-SR04 · DHT11 · RAIN · BLE · QUADRATIC REGRESSION</p>
+</header>
+
+<button id="connectBtn">⬡ CONNECT BLUETOOTH</button>
+
+<div class="status-bar">
+  <div class="dot" id="statusDot"></div>
+  <span id="statusText">Not connected — use Chrome on Android</span>
+</div>
+
+<div id="calibCard">
+  <div class="calib-header">
+    <span>BASE LEVEL CALIBRATION</span>
+    <span id="calibPct">0%</span>
+  </div>
+  <div class="calib-bar-wrap">
+    <div class="calib-bar-fill" id="calibFill" style="width:0%"></div>
+  </div>
+  <div class="calib-info">
+    <span id="calibStatus">Waiting for ESP32...</span>
+    <span id="baseVal">Base: --</span>
+  </div>
+</div>
+
+<div id="weatherBlock">
+  <div class="wx-top">
+    <div class="wx-icon" id="wxIcon">🌡️</div>
+    <div class="wx-right">
+      <div id="dayLabel" style="color:var(--dim)">WAITING...</div>
+      <div id="daySubLabel">Connect sensor to begin</div>
+    </div>
+  </div>
+  <div class="wx-grid">
+    <div class="wx-cell">
+      <div class="wx-cell-label">TEMPERATURE</div>
+      <div class="wx-cell-val" id="liveTemp" style="color:var(--temp)">--</div>
+      <div class="wx-cell-unit">°C</div>
+    </div>
+    <div class="wx-cell">
+      <div class="wx-cell-label">HUMIDITY</div>
+      <div class="wx-cell-val" id="liveHum" style="color:var(--hum)">--</div>
+      <div class="wx-cell-unit">% RH</div>
+    </div>
+    <div class="wx-cell">
+      <div class="wx-cell-label">WATER LEVEL</div>
+      <div class="wx-cell-val" id="liveWater" style="color:var(--water)">--</div>
+      <div class="wx-cell-unit">% above base</div>
+    </div>
+    <div class="wx-cell">
+      <div class="wx-cell-label">RAIN</div>
+      <div class="wx-cell-val" id="liveRain" style="color:var(--rain-c)">--</div>
+      <div class="wx-cell-unit" id="rainIntLabel">intensity</div>
+      <div class="rain-dots">
+        <div class="rain-dot" id="rd1"></div>
+        <div class="rain-dot" id="rd2"></div>
+        <div class="rain-dot" id="rd3"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="tankCard">
+  <div class="tank-header">
+    <h3>WATER TANK</h3>
+    <div id="flowBadge">WAITING</div>
+  </div>
+  <div class="tank-body">
+    <div class="tank-visual-wrap" style="position:relative;">
+      <div class="tank-outer">
+        <div class="tank-fill" id="tankFill"></div>
+      </div>
+      <div class="tank-ticks">
+        <span>100</span><span>75</span><span>50</span><span>25</span><span>0</span>
+      </div>
+    </div>
+    <div class="tank-stats">
+      <div class="tank-big" id="tankPct">--%</div>
+      <div class="tank-sub">above base level</div>
+      <div class="tank-rise" id="tankRise" style="color:var(--dim)">Rise: -- cm</div>
+      <div class="tank-sub" style="margin-top:6px;" id="tankDist">Dist: -- cm</div>
+    </div>
+  </div>
+</div>
+
+<div class="stats-row">
+  <div class="stat-box"><div class="stat-val" id="stMin">--</div><div class="stat-lbl">MIN %</div></div>
+  <div class="stat-box"><div class="stat-val" id="stMax">--</div><div class="stat-lbl">MAX %</div></div>
+  <div class="stat-box"><div class="stat-val" id="stCount">0</div><div class="stat-lbl">READINGS</div></div>
+</div>
+
+<div id="predCard">
+  <h3>2-MINUTE QUADRATIC FORECAST</h3>
+  <div class="sub">QUADRATIC POLYNOMIAL REGRESSION · ROLLING 60s WINDOW</div>
+  <div class="pred-grid">
+    <div class="pred-item">
+      <div class="pred-lbl">WATER LEVEL NOW</div>
+      <div class="pred-val" id="predWaterNow" style="color:var(--water3)">--</div>
+      <div class="pred-unit">%</div>
+    </div>
+    <div class="pred-item">
+      <div class="pred-lbl">WATER +2 MIN</div>
+      <div class="pred-val" id="predWaterFut" style="color:var(--water3)">--</div>
+      <div class="pred-unit">%</div>
+      <div class="pred-trend trend-fl" id="predWaterTrend">Waiting...</div>
+    </div>
+    <div class="pred-item">
+      <div class="pred-lbl">TEMP +2 MIN</div>
+      <div class="pred-val" id="predTempFut" style="color:var(--temp2)">--</div>
+      <div class="pred-unit">°C</div>
+      <div class="pred-trend trend-fl" id="predTempTrend">Waiting...</div>
+    </div>
+    <div class="pred-item">
+      <div class="pred-lbl">HUM +2 MIN</div>
+      <div class="pred-val" id="predHumFut" style="color:var(--hum2)">--</div>
+      <div class="pred-unit">%</div>
+      <div class="pred-trend trend-fl" id="predHumTrend">Waiting...</div>
+    </div>
+  </div>
+  <div id="overflowRisk">OVERFLOW RISK: WAITING</div>
+</div>
+
+<div class="r2-card">
+  <h3>MODEL CONFIDENCE (R²)</h3>
+  <div class="r2-row"><span class="r2-lbl">WATER</span><div class="r2-bar"><div class="r2-fill w" id="r2w" style="width:0%"></div></div><span class="r2-pct" id="r2wp">0%</span></div>
+  <div class="r2-row"><span class="r2-lbl">TEMP</span><div class="r2-bar"><div class="r2-fill t" id="r2t" style="width:0%"></div></div><span class="r2-pct" id="r2tp">0%</span></div>
+  <div class="r2-row"><span class="r2-lbl">HUMIDITY</span><div class="r2-bar"><div class="r2-fill h" id="r2h" style="width:0%"></div></div><span class="r2-pct" id="r2hp">0%</span></div>
+</div>
+
+<div class="prog-wrap">
+  <div class="prog-header">
+    <span id="progLabel">Collecting data for prediction...</span>
+    <span id="progCount">0 / 12</span>
+  </div>
+  <div class="prog-bar"><div class="prog-fill" id="progFill" style="width:0%"></div></div>
+</div>
+
+<div class="chart-card-full">
+  <h3>WATER LEVEL — LIVE + QUADRATIC PREDICTION PATH</h3>
+  <canvas id="chartWater" style="height:120px;"></canvas>
+</div>
+
+<div class="charts-section">
+  <div class="chart-card">
+    <h3>TEMPERATURE</h3>
+    <canvas id="chartTemp" style="height:var(--chart-h);"></canvas>
+  </div>
+  <div class="chart-card">
+    <h3>HUMIDITY</h3>
+    <canvas id="chartHum" style="height:var(--chart-h);"></canvas>
+  </div>
+</div>
+
+<div class="hist-card">
+  <h3>READING LOG</h3>
+  <div id="histList"></div>
+</div>
+
+<footer>ESP32 · HC-SR04 · DHT11 · RAIN · BLE · Chrome Android required</footer>
+
+<script>
+// ================================================
+//  CONFIG — must match .ino values
+// ================================================
+const SVC_UUID  = 'facade00-babe-cafe-dead-beefcafebabe';
+const CHAR_UUID = 'facade01-babe-cafe-dead-beefcafebabe';
+
+const TANK_DEPTH_CM  = 35;
+const PREDICT_AHEAD  = 120;   // seconds (2 min)
+const MIN_READINGS   = 12;
+const MAX_WINDOW_S   = 60;
+const STABLE_THRESH  = 0.5;   // % change considered stable
+
+// ================================================
+//  STATE
+// ================================================
+let readings   = [];   
+let histUI     = [];
+let startTime  = null;
+
+// ================================================
+//  QUADRATIC REGRESSION ENGINE (y = ax^2 + bx + c)
+// ================================================
+function quadraticRegression(xs, ys) {
+  const n = xs.length;
+  if (n < 3) return null; // Needs at least 3 points for a parabola
+
+  let sumX = 0, sumX2 = 0, sumX3 = 0, sumX4 = 0;
+  let sumY = 0, sumXY = 0, sumX2Y = 0;
+
+  for (let i = 0; i < n; i++) {
+    const x = xs[i];
+    const y = ys[i];
+    const x2 = x * x;
+
+    sumX += x;
+    sumX2 += x2;
+    sumX3 += x2 * x;
+    sumX4 += x2 * x2;
+    sumY += y;
+    sumXY += x * y;
+    sumX2Y += x2 * y;
+  }
+
+  // System Matrix setup (Least Squares Approach)
+  const M11 = n,     M12 = sumX,   M13 = sumX2;
+  const M21 = sumX,  M22 = sumX2,  M23 = sumX3;
+  const M31 = sumX2, M32 = sumX3,  M33 = sumX4;
+
+  const B1 = sumY, B2 = sumXY, B3 = sumX2Y;
+
+  // Cramer's Rule Matrix Determinant calculation
+  const det = M11*(M22*M33 - M23*M32) - M12*(M21*M33 - M23*M31) + M13*(M21*M32 - M22*M31);
+  if (Math.abs(det) < 1e-6) return null;
+
+  const detA = B1*(M22*M33 - M23*M32) - M12*(B2*M33 - M23*B3) + M13*(B2*M32 - M22*B3);
+  const detB = M11*(B2*M33 - M23*B3) - B1*(M21*M33 - M23*M31) + M13*(M21*B3 - B2*M31);
+  const detC = M11*(M22*B3 - B2*M32) - M12*(M21*B3 - B2*M31) + B1*(M21*M32 - M22*M31);
+
+  const c = detA / det;
+  const b = detB / det;
+  const a = detC / det; // 'a' is your acceleration component!
+
+  // R-Squared (Confidence metric) calculation
+  const meanY = sumY / n;
+  let ssTot = 0, ssRes = 0;
+  for (let i = 0; i < n; i++) {
+    const pred = a*xs[i]*xs[i] + b*xs[i] + c;
+    ssTot += (ys[i] - meanY) ** 2;
+    ssRes += (ys[i] - pred) ** 2;
+  }
+  const r2 = ssTot > 0 ? Math.max(0, 1 - (ssRes / ssTot)) : 0;
+
+  return { a, b, c, r2, isQuadratic: true };
+}
+
+function predictQuad(m, x) { 
+  if (!m) return null;
+  return m.a * x * x + m.b * x + m.c; 
+}
+
+// Keep a linear model fallback helper for single-variable trends if needed
+function linReg(xs, ys) {
+  const n = xs.length;
+  if (n < 2) return null;
+  const mx = xs.reduce((a,b)=>a+b,0)/n;
+  const my = ys.reduce((a,b)=>a+b,0)/n;
+  let num=0, den=0;
+  xs.forEach((x,i)=>{ num+=(x-mx)*(ys[i]-my); den+=(x-mx)**2; });
+  const slope = den ? num/den : 0;
+  const intercept = my - slope*mx;
+  return { slope, intercept };
+}
+
+// ================================================
+//  DAY CLASSIFICATION
+// ================================================
+const DAY_TYPES = [
+  [({f,temp,hum,rain,ri})=> f,                              'FLOOD WARNING',  '🌊', '#e63946'],
+  [({temp,hum,rain,ri})=> rain&&temp<20&&hum>88,            'STORMY',         '⛈️', '#6c63ff'],
+  [({temp,hum,rain,ri})=> rain&&ri===3,                     'HEAVY RAIN',     '🌧️', '#1d6fa4'],
+  [({temp,hum,rain,ri})=> rain&&ri===2,                     'RAINY',          '🌧️', '#2196f3'],
+  [({temp,hum,rain,ri})=> rain&&ri===1,                     'LIGHT RAIN',     '🌦️', '#4895ef'],
+  [({temp,hum,rain,ri})=> rain,                             'DRIZZLE',        '🌦️', '#64b5f6'],
+  [({temp,hum,rain,ri})=> temp>=40,                         'EXTREME HOT',    '🔥', '#d62828'],
+  [({temp,hum,rain,ri})=> temp>=36&&hum<40,                 'SCORCHING',      '☀️', '#f77f00'],
+  [({temp,hum,rain,ri})=> temp>=33&&hum<50,                 'SUNNY HOT',      '🌤️', '#ff6b35'],
+  [({temp,hum,rain,ri})=> temp>=28&&hum<55,                 'SUNNY',          '☀️', '#ffd60a'],
+  [({temp,hum,rain,ri})=> temp>=26&&hum>=55&&hum<70,        'WARM',           '🌤️', '#f4a261'],
+  [({temp,hum,rain,ri})=> temp>=22&&hum>=70&&hum<80,        'HUMID',          '🌫️', '#9ecae1'],
+  [({temp,hum,rain,ri})=> hum>=80&&!rain,                   'CLOUDY',         '☁️', '#b0bec5'],
+  [({temp,hum,rain,ri})=> temp>=18&&temp<22,                'PLEASANT',       '🌥️', '#2ec4b6'],
+  [({temp,hum,rain,ri})=> temp>=14&&temp<18,                'COOL',           '🌬️', '#a8dadc'],
+  [({temp,hum,rain,ri})=> temp<14,                          'COLD',           '❄️', '#90e0ef'],
+  [()=>true,                                                 'MILD',           '🌡️', '#c8e8ff'],
+];
+
+function classifyDay(temp, hum, rain, ri, flood) {
+  const ctx = { f:flood, temp, hum, rain, ri };
+  for (const [fn, name, icon, color] of DAY_TYPES) {
+    if (fn(ctx)) return { name, icon, color };
+  }
+  return { name:'MILD', icon:'🌡️', color:'#c8e8ff' };
+}
+
+// ================================================
+//  TREND TEXT (Processes curvature curves)
+// ================================================
+function trendTextQuad(model, nowT, unit) {
+  if (!model) return { text:`Waiting...`, cls:'trend-fl' };
+  
+  const valNow = predictQuad(model, nowT);
+  const valFut = predictQuad(model, nowT + PREDICT_AHEAD);
+  const change = valFut - valNow;
+  const abs = Math.abs(change).toFixed(1);
+
+  // If acceleration is strong and expanding upwards
+  if (model.a > 0.005 && change > 1) {
+    return { text: ` Accel ↑ +${abs}${unit}`, cls: 'trend-accel' };
+  }
+  if (Math.abs(change) < 0.3) return { text:`→ Stable`, cls:'trend-fl' };
+  if (change > 0) return { text:`↑ +${abs}${unit} in 2min`, cls:'trend-up' };
+  return { text:`↓ ${Math.abs(change).toFixed(1)}${unit} in 2min`, cls:'trend-dn' };
+}
+
+function setR2(fillId, pctId, val) {
+  const v = Math.round(val*100);
+  document.getElementById(fillId).style.width = v+'%';
+  document.getElementById(pctId).textContent  = v+'%';
+}
+
+function rainIntensity(adc, rain) {
+  if (!rain) return 0;
+  if (adc > 3000) return 1;
+  if (adc > 2000) return 2;
+  return 3;
+}
+
+function flowState(distSlope, rain, flood, streak) {
+  if (flood) return 'FLOOD';
+  if (Math.abs(distSlope) < 0.003) return 'STOPPED';
+  return distSlope < 0 ? 'RISING' : 'FALLING';
+}
+
+// ================================================
+//  MAIN UPDATE LOOP
+// ================================================
+function update(temp, hum, dist, baseDist, rain, rainADC, calib, flood, streak) {
+  if (!startTime) startTime = Date.now();
+  const t = (Date.now() - startTime) / 1000;
+
+  const rise = calib && dist>0 && baseDist>0 ? baseDist - dist : 0;
+  const pct  = calib && baseDist>0 ? Math.max(0, Math.min(100,(rise/TANK_DEPTH_CM)*100)) : 0;
+  const ri   = rainIntensity(rainADC, rain);
+
+  readings.push({ t, dist, baseDist, pct, rise, temp, hum, rain, rainADC, calib, flood, streak, ts:new Date() });
+
+  // ---- CALIBRATION UI ----
+  const calibPctV = calib ? 100 : Math.min(100, (readings.filter(r=>!r.calib).length/5)*100);
+  document.getElementById('calibFill').style.width = (calib?100:calibPctV)+'%';
+  document.getElementById('calibPct').textContent  = (calib?100:Math.round(calibPctV))+'%';
+  document.getElementById('calibStatus').textContent = calib ? '✓ CALIBRATED' : 'Collecting base samples...';
+  document.getElementById('calibStatus').style.color = calib ? 'var(--safe)' : 'var(--warn)';
+  document.getElementById('baseVal').textContent = baseDist>0 ? `Base: ${baseDist.toFixed(1)} cm` : 'Base: --';
+
+  // ---- STANDARD FLOOD BANNER ----
+  document.getElementById('floodBanner').style.display = flood ? 'block' : 'none';
+
+  // ---- DAY CLASSIFICATION ----
+  const day = classifyDay(temp, hum, rain, ri, flood);
+  document.getElementById('wxIcon').textContent    = day.icon;
+  document.getElementById('dayLabel').textContent  = day.name;
+  document.getElementById('dayLabel').style.color  = day.color;
+  document.getElementById('daySubLabel').textContent = rain
+    ? ['','Light rain','Moderate rain','Heavy rain'][ri] || 'Rain'
+    : `${temp.toFixed(1)}°C · ${hum.toFixed(0)}% RH`;
+
+  // ---- SENSOR VALUES ----
+  document.getElementById('liveTemp').textContent = temp.toFixed(1);
+  document.getElementById('liveTemp').style.color = temp>=36 ? '#d62828' : temp>=28 ? 'var(--temp)' : temp<18 ? 'var(--cool)' : 'var(--temp2)';
+  document.getElementById('liveHum').textContent  = hum.toFixed(0);
+  document.getElementById('liveWater').textContent = calib ? pct.toFixed(1) : '--';
+  document.getElementById('liveRain').textContent  = rain ? ['','LIGHT','MOD','HEAVY'][ri]||'RAIN' : 'DRY';
+  document.getElementById('liveRain').style.color  = rain ? 'var(--rain-c)' : 'var(--dim2)';
+  document.getElementById('rainIntLabel').textContent = rain ? `ADC: ${rainADC}` : 'no rain';
+
+  [1,2,3].forEach(i=>{
+    document.getElementById('rd'+i).classList.toggle('active', rain && ri>=i);
+  });
+
+  // ---- TANK GRAPHICS ----
+  const fillH = calib ? pct.toFixed(1) : 0;
+  document.getElementById('tankFill').style.height = fillH+'%';
+  document.getElementById('tankPct').textContent   = calib ? pct.toFixed(1)+'%' : '--%';
+  document.getElementById('tankPct').style.color   = pct>80 ? 'var(--danger)' : pct>50 ? 'var(--warn)' : 'var(--water)';
+  document.getElementById('tankRise').textContent  = calib ? `Rise: ${rise>=0?'+':''}${rise.toFixed(1)} cm` : 'Rise: --';
+  document.getElementById('tankRise').style.color  = rise>2 ? 'var(--danger)' : rise>0 ? 'var(--warn)' : 'var(--safe)';
+  document.getElementById('tankDist').textContent  = `Dist: ${dist.toFixed(1)} cm | Base: ${baseDist>0?baseDist.toFixed(1):'--'} cm`;
+
+  // Flow Badge calculation using historical windows
+  const win = readings.filter(r=>r.t>=t-MAX_WINDOW_S);
+  let fState = 'WAITING';
+  if (win.length>=2) {
+    const mLinear = linReg(win.map(r=>r.t), win.map(r=>r.dist));
+    fState = flowState(mLinear?mLinear.slope:0, rain, flood, streak);
+  }
+  const badge = document.getElementById('flowBadge');
+  badge.textContent  = fState;
+  badge.className    = fState;
+
+  // ---- COUNTERS ----
+  const pcts = readings.filter(r=>r.calib).map(r=>r.pct);
+  if (pcts.length>0) {
+    document.getElementById('stMin').textContent = Math.min(...pcts).toFixed(0)+'%';
+    document.getElementById('stMax').textContent = Math.max(...pcts).toFixed(0)+'%';
+  }
+  document.getElementById('stCount').textContent = readings.length;
+
+  // ---- PREDICTION TIMELINES ----
+  const MIN_PRED = MIN_READINGS;
+  const progPct = Math.min(100,(readings.length/MIN_PRED)*100);
+  document.getElementById('progFill').style.width  = progPct+'%';
+  document.getElementById('progCount').textContent = `${Math.min(readings.length,MIN_PRED)} / ${MIN_PRED}`;
+  document.getElementById('progLabel').textContent = readings.length>=MIN_PRED ? 'Quadratic Model active ✓' : 'Collecting data...';
+
+  if (win.length >= 3) {
+    const xs    = win.map(r=>r.t);
+    const mPct  = quadraticRegression(xs, win.map(r=>r.pct));
+    const mTemp = quadraticRegression(xs, win.map(r=>r.temp));
+    const mHum  = quadraticRegression(xs, win.map(r=>r.hum));
+
+    const futT = t + PREDICT_AHEAD;
+
+    if (readings.length >= MIN_PRED && mPct && mTemp && mHum) {
+      const predPct  = Math.max(0, Math.min(100, predictQuad(mPct,  futT)));
+      const predTemp = predictQuad(mTemp, futT);
+      const predHum  = Math.max(0, Math.min(100, predictQuad(mHum, futT)));
+
+      document.getElementById('predWaterNow').textContent = pct.toFixed(1);
+      document.getElementById('predWaterFut').textContent = predPct.toFixed(1);
+      document.getElementById('predTempFut').textContent  = predTemp.toFixed(1);
+      document.getElementById('predHumFut').textContent   = predHum.toFixed(1);
+
+      // Handle trend translations using parabolas
+      const tw = trendTextQuad(mPct, t, '%');
+      const tt = trendTextQuad(mTemp, t, '°C');
+      const th = trendTextQuad(mHum, t, '%');
+
+      setTrend('predWaterTrend', tw);
+      setTrend('predTempTrend',  tt);
+      setTrend('predHumTrend',   th);
+
+      // ----- TRIGGER PURPLE NON-LINEAR ACCELERATION BANNER -----
+      // Checks if it's raining and water vector is curving up exponentially (acceleration coefficient a > 0.015)
+      if (rain && mPct.a > 0.015) {
+        document.getElementById('quadraticAccelBanner').style.display = 'block';
+      } else {
+        document.getElementById('quadraticAccelBanner').style.display = 'none';
+      }
+
+      // Overflow metrics
+      const risk = document.getElementById('overflowRisk');
+      if (predPct > 88) {
+        risk.textContent = '⚠️ OVERFLOW RISK: HIGH';
+        risk.className = 'high';
+      } else if (predPct > 65) {
+        risk.textContent = '⚡ OVERFLOW RISK: MEDIUM';
+        risk.className = 'med';
+      } else {
+        risk.textContent = '✓ OVERFLOW RISK: LOW';
+        risk.className = 'low';
+      }
+
+      setR2('r2w','r2wp',mPct.r2);
+      setR2('r2t','r2tp',mTemp.r2);
+      setR2('r2h','r2hp',mHum.r2);
+    }
+
+    // Render Canvas Charts
+    drawChart('chartWater', xs, win.map(r=>r.pct), mPct,  t, futT, '#00b4d8', '#90e0ef', '%',    120, true);
+    drawChart('chartTemp',  xs, win.map(r=>r.temp), mTemp, t, futT, '#ff6b35', '#ff9a6c', '°C',   100, false);
+    drawChart('chartHum',   xs, win.map(r=>r.hum),  mHum,  t, futT, '#48cae4', '#90e0ef', '%',    100, false);
+  }
+
+  // ---- HISTORICAL LOG ENGINE ----
+  const timeStr = new Date().toLocaleTimeString('en',{hour12:false});
+  histUI.unshift({ timeStr, temp, hum, pct, rain, ri, day:day.name });
+  if (histUI.length>8) histUI.pop();
+  document.getElementById('histList').innerHTML = histUI.map(h=>`
+    <div class="hist-row">
+      <span class="h-time">${h.timeStr}</span>
+      <span class="h-temp">${h.temp.toFixed(1)}°C</span>
+      <span class="h-hum">${h.hum.toFixed(0)}%</span>
+      <span class="h-water">${h.pct.toFixed(0)}%${h.rain?'🌧':''}</span>
+      <span class="h-day">${h.day}</span>
+    </div>`).join('');
+}
+
+function setTrend(id, t) {
+  const el = document.getElementById(id);
+  el.textContent = t.text;
+  el.className   = 'pred-trend ' + t.cls;
+}
+
+// ================================================
+//  CANVAS CHART (Plots curves natively)
+// ================================================
+function drawChart(canvasId, xs, ys, model, nowT, futT, lineColor, predColor, unit, canvasH, showFull) {
+  const canvas = document.getElementById(canvasId);
+  const dpr = window.devicePixelRatio || 1;
+  const W = canvas.offsetWidth;
+  const H = canvasH;
+  canvas.width  = W * dpr;
+  canvas.height = H * dpr;
+  canvas.style.width  = W+'px';
+  canvas.style.height = H+'px';
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+  ctx.clearRect(0,0,W,H);
+
+  if (xs.length < 2) {
+    ctx.fillStyle = '#3a6a8a';
+    ctx.font = `10px Courier New`;
+    ctx.textAlign = 'center';
+    ctx.fillText('Collecting...', W/2, H/2);
+    return;
+  }
+
+  // Calculate coordinates across the prediction horizon
+  const predY = model && readings.length>=MIN_READINGS ? predictQuad(model, futT) : null;
+  const allY  = [...ys, ...(predY!==null?[predY]:[])];
+  const minY  = Math.min(...allY) - (unit==='%'?3:0.5);
+  const maxY  = Math.max(...allY) + (unit==='%'?3:0.5);
+  const minX  = xs[0], maxX = futT;
+
+  const PAD = {l:6, r:6, t:12, b:18};
+  const cw  = W-PAD.l-PAD.r;
+  const ch  = H-PAD.t-PAD.b;
+
+  function cx(x) { return PAD.l + ((x-minX)/(maxX-minX||1))*cw; }
+  function cy(y) { return PAD.t + ch - ((y-minY)/(maxY-minY||1))*ch; }
+
+  // Background reference bars
+  ctx.strokeStyle='#163550'; ctx.lineWidth=0.5;
+  const steps = 3;
+  for(let i=0;i<=steps;i++){
+    const y = PAD.t+(ch/steps)*i;
+    ctx.beginPath(); ctx.moveTo(PAD.l,y); ctx.lineTo(PAD.l+cw,y); ctx.stroke();
+    const val = maxY - ((maxY-minY)/steps)*i;
+    ctx.fillStyle='#1e4a6e'; ctx.font='7px Courier New'; ctx.textAlign='left';
+    ctx.fillText(val.toFixed(0), PAD.l+2, y-2);
+  }
+
+  // Splitting timestamp axis lines
+  const nowX = cx(nowT);
+  ctx.setLineDash([3,3]); ctx.strokeStyle='#1e4a6e'; ctx.lineWidth=1;
+  ctx.beginPath(); ctx.moveTo(nowX,PAD.t); ctx.lineTo(nowX,PAD.t+ch); ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.fillStyle='#3a6a8a'; ctx.font='7px Courier New'; ctx.textAlign='center';
+  ctx.fillText('NOW', nowX, PAD.t+ch+10);
+  ctx.fillText('+2m', cx(futT), PAD.t+ch+10);
+
+  // Trace telemetry history string line
+  ctx.beginPath();
+  ctx.strokeStyle = lineColor;
+  ctx.lineWidth = 1.8;
+  xs.forEach((x,i)=>{ i===0?ctx.moveTo(cx(x),cy(ys[i])):ctx.lineTo(cx(x),cy(ys[i])); });
+  ctx.stroke();
+
+  // Draw quadratic prediction path curve
+  if (predY!==null && readings.length>=MIN_READINGS) {
+    ctx.beginPath();
+    ctx.strokeStyle = predColor;
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([4,3]);
+    
+    // Graph out points step-by-step along the parabola path to build smooth curves
+    const lastX = nowT;
+    const lastY = ys[ys.length-1];
+    ctx.moveTo(cx(lastX), cy(lastY));
+    
+    const segments = 15;
+    for(let k=1; k<=segments; k++) {
+      const currT = lastX + ((futT - lastX) / segments) * k;
+      const currY = predictQuad(model, currT);
+      ctx.lineTo(cx(currT), cy(currY));
+    }
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Curve terminal dot
+    ctx.fillStyle = predColor;
+    ctx.beginPath(); ctx.arc(cx(futT), cy(predY), 4, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = predColor; ctx.font='8px Courier New'; ctx.textAlign='center';
+    ctx.fillText(predY.toFixed(1)+unit, cx(futT), cy(predY)-7);
+  }
+
+  // Realtime locator node anchor point
+  ctx.fillStyle = lineColor;
+  ctx.beginPath();
+  ctx.arc(cx(nowT), cy(ys[ys.length-1]), 4, 0, Math.PI*2);
+  ctx.fill();
+  ctx.fillStyle=lineColor; ctx.font='8px Courier New'; ctx.textAlign='center';
+  ctx.fillText(ys[ys.length-1].toFixed(1)+unit, cx(nowT), cy(ys[ys.length-1])-7);
+}
+
+// ================================================
+//  BLE CONNECTIVITY SUBSYSTEM
+// ================================================
+async function connect() {
+  if (!navigator.bluetooth) {
+    alert('Web Bluetooth requires Chrome on Android.\niOS Safari does not support Web Bluetooth.');
+    return;
+  }
+  const btn = document.getElementById('connectBtn');
+  btn.disabled = true;
+  document.getElementById('statusText').textContent = 'Scanning...';
+
+  try {
+    const device = await navigator.bluetooth.requestDevice({
+      filters: [{ name: 'ESP32_WeatherFlood' }],
+      optionalServices: [SVC_UUID]
+    });
+
+    document.getElementById('statusText').textContent = 'Connecting...';
+
+    device.addEventListener('gattserverdisconnected', ()=>{
+      document.getElementById('statusDot').className = 'dot err';
+      document.getElementById('statusText').textContent = 'Disconnected — tap to reconnect';
+      btn.textContent = '⬡ CONNECT BLUETOOTH';
+      btn.className = '';
+      btn.disabled = false;
+    });
+
+    const server = await device.gatt.connect();
+    const svc    = await server.getPrimaryService(SVC_UUID);
+    const char   = await svc.getCharacteristic(CHAR_UUID);
+    await char.startNotifications();
+
+    char.addEventListener('characteristicvaluechanged', ev=>{
+      const raw = new TextDecoder().decode(ev.target.value).trim();
+      if (!raw.startsWith('WX:')) return;
+
+      const parts = raw.slice(3).split(',');
+      if (parts.length < 9) return;
+
+      const temp    = parseFloat(parts[0]);
+      const hum     = parseFloat(parts[1]);
+      const dist    = parseFloat(parts[2]);
+      const baseDist= parseFloat(parts[3]);
+      const rain    = parseInt(parts[4]) === 1;
+      const rainADC = parseInt(parts[5]);
+      const calib   = parseInt(parts[6]) === 1;
+      const flood   = parseInt(parts[7]) === 1;
+      const streak  = parseInt(parts[8]);
+
+      if (isNaN(temp)||isNaN(hum)) return;
+
+      document.getElementById('statusDot').className = 'dot live';
+      document.getElementById('statusText').textContent = 'LIVE — '+device.name;
+      update(temp, hum, dist, baseDist, rain, rainADC, calib, flood, streak);
+    });
+
+    document.getElementById('statusDot').className = 'dot live';
+    document.getElementById('statusText').textContent = 'LIVE — '+device.name;
+    btn.textContent = '✓ CONNECTED';
+    btn.className = 'connected';
+
+  } catch(err) {
+    console.error(err);
+    document.getElementById('statusDot').className = 'dot err';
+    document.getElementById('statusText').textContent = 'Connection failed — try again';
+    btn.disabled = false;
+    btn.textContent = '⬡ CONNECT BLUETOOTH';
+  }
+}
+
+document.getElementById('connectBtn').addEventListener('click', connect);
+
+window.addEventListener('resize', ()=>{
+  if (!readings.length) return;
+  const r = readings[readings.length-1];
+  const t = (Date.now()-startTime)/1000;
+  const win = readings.filter(x=>x.t>=t-MAX_WINDOW_S);
+  if (win.length<2) return;
+  const xs = win.map(x=>x.t), futT = t+PREDICT_AHEAD;
+  drawChart('chartWater',xs,win.map(x=>x.pct), quadraticRegression(xs,win.map(x=>x.pct)),  t,futT,'#00b4d8','#90e0ef','%',  120,true);
+  drawChart('chartTemp', xs,win.map(x=>x.temp),quadraticRegression(xs,win.map(x=>x.temp)), t,futT,'#ff6b35','#ff9a6c','°C', 100,false);
+  drawChart('chartHum',  xs,win.map(x=>x.hum), quadraticRegression(xs,win.map(x=>x.hum)),  t,futT,'#48cae4','#90e0ef','%',  100,false);
+});
+</script>
+</body>
+</html>
