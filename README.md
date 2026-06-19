@@ -17,6 +17,9 @@ An intelligent ESP32-based IoT monitoring system that collects real-time tempera
 
 * ESP32
 * Arduino IDE
+
+##For Vedio
+https://www.youtube.com/watch?v=4vh1hOY8FoM
 * Quadratic Regression (Machine Learning)
 * HTML, CSS, JavaScript
 * Chart.js
